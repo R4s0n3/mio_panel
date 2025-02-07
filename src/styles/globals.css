@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* Define CSS Variables */
+:root {
+    --font-jersey-mono: 'Jersey 10', sans-serif;
+    --font-russo-sans: 'Russo One', sans-serif;
+    --font-roboto-sans: 'Roboto', sans-serif;
+  }
