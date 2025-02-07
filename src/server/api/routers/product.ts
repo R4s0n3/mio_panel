@@ -5,7 +5,6 @@ import {
     protectedProcedure,
     publicProcedure,
   } from "@/server/api/trpc";
-import { priceToCents } from '@/util/functions';
   
   export const productRouter = createTRPCRouter({
       getAll: publicProcedure
@@ -15,7 +14,6 @@ import { priceToCents } from '@/util/functions';
       fromParams: publicProcedure
       .input(z.string()) 
       .query(({ctx, input}) => {
-      
           return ctx.db.product.findFirst({
               where:{
                   id: input
@@ -34,7 +32,7 @@ import { priceToCents } from '@/util/functions';
       .input(z.object({
         name:z.string(),
         description:z.string().max(250),
-        price:z.number().min(0),
+        price:z.number().min(0).positive({message:"Price amount must be positive..."}),
         image:z.string().optional(),
         type:z.string().default("donation"),
       }))
@@ -50,11 +48,9 @@ import { priceToCents } from '@/util/functions';
         description:z.string().max(250),
         price:z.number().min(0).positive({message:"Price amount must be positive..."}),
         image:z.string().optional(),
-        type:z.string().default("donation"),
+        type:z.string(),
       }))
       .mutation(({ctx, input}) => {
-        const transformedPrice  = priceToCents(input.price)
-        console.log("DA PRICE", transformedPrice)
         return ctx.db.product.update({
             where:{
                 id:input.id
@@ -62,7 +58,7 @@ import { priceToCents } from '@/util/functions';
             data:{
               name:input.name,
               description: input.description,
-              price: transformedPrice,
+              price: input.price,
               image: input.image,
               type: input.type,
             }
