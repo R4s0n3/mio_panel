@@ -5,9 +5,14 @@ import Navigation from "../../_components/navigation";
 import ProductForm from "../create/_components/product-form";
 
 
-export default async function UpdateProject(slug:{ params: {productId: string} }) {
-    const productDataId = slug.params.productId
-    const foundProduct = await api.product.fromParams(productDataId)
+export default async function UpdateProject({
+    params,
+  }: {
+    params: Promise<{ productId: string }>
+  }) {
+    
+    const productId = (await params).productId
+    const foundProduct = await api.product.fromParams(productId)
     const session = await auth();
 
     if(!session){

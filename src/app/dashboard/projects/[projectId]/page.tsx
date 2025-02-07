@@ -5,9 +5,13 @@ import Navigation from "../../_components/navigation";
 import ProjectForm from "../create/_components/project-form";
 
 
-export default async function CreateProject(slug:{ params: {projectId: string} }) {
-    const projectDataId = slug.params.projectId
-    const foundProject = await api.project.fromParams(projectDataId)
+export default async function CreateProject({
+    params,
+  }: {
+    params: Promise<{ projectId: string }>
+  })  {
+    const projectId = (await params).projectId
+    const foundProject = await api.project.fromParams(projectId)
     const session = await auth();
     if(!session){
         return <LoginPage />
