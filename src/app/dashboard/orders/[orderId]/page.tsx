@@ -2,18 +2,17 @@ import { auth } from "@/server/auth";
 import { api, HydrateClient } from "@/trpc/server";
 import LoginPage from "@/app/_components/login-page";
 import Navigation from "../../_components/navigation";
-import ProductForm from "../create/_components/product-form";
+import SingleOrderView from "./_components/single-order-view";
 
 
-export default async function UpdateProduct({
+export default async function SingleOrder({
     params,
   }: {
-    params: Promise<{ productId: string }>
+    params: Promise<{ orderId: string }>
   }) {
     
-    const {productId} = (await params)
-    void api.product.fromParams.prefetch(productId)
-
+    const { orderId } = (await params)
+    void api.parcel.fromParams.prefetch(orderId)
     const session = await auth();
 
     if(!session){
@@ -21,9 +20,10 @@ export default async function UpdateProduct({
     }  
     if(session.user.role !== "ADMIO"){
         return <main className="flex min-h-screen flex-col lg:flex-row bg-gradient-to-b from-primary-700 to-primary-900 text-headings">
-you are not allowed to see this content.
-</main>
+        you are not allowed to see this content.
+    </main>
     }  
+
 
 if(!session){
     return <LoginPage />
@@ -33,15 +33,15 @@ if(session.user.role !== "ADMIO"){
 you are not allowed to see this content.
 </main>
 }  
-
+  
 return (
     <HydrateClient>
-    <main className="flex min-h-screen flex-col lg:flex-row bg-primary-700 text-headings">
+    <main className="flex min-h-screen flex-col lg:flex-row  bg-primary-700  text-headings">
        <Navigation />
-       <div className="flex-1 h-screen overflow-y-auto">
-        <div className="w-full flex flex-col gap-12 p-4 pb-8">
-       <h1 className="text-5xl text-headings font-headline p-4 italic">Product // Update</h1>
-       <ProductForm productId={productId}/>
+       <div className="flex-1 pb-8">
+        <div className="w-full flex flex-col gap-8 p-4">
+       <h1 className="text-5xl text-highlight-cyan font-headline">Orders</h1>
+       <SingleOrderView />
         </div>
        </div>
     </main>

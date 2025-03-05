@@ -9,7 +9,11 @@ import {
   export const productRouter = createTRPCRouter({
       getAll: publicProcedure
       .query(({ctx}) => {
-        return ctx.db.product.findMany({})
+        return ctx.db.product.findMany({
+          where:{
+            deletedAt: undefined
+          }
+        })
       }),
       fromParams: publicProcedure
       .input(z.string()) 
@@ -18,13 +22,8 @@ import {
               where:{
                   id: input
               },
-              select:{
-                  id:true,
-                  name:true,
-                  description:true,
-                  type:true,
-                  price:true,
-                  image:true
+              include:{
+                type:true
               }
           })
       }),
@@ -35,10 +34,22 @@ import {
         price:z.number().min(0).positive({message:"Price amount must be positive..."}),
         image:z.string().optional(),
         type:z.string().default("donation"),
+        weight: z.string(),
       }))
       .mutation(({ctx, input}) => {
         return ctx.db.product.create({
-            data:input
+          data:{
+            name:input.name,
+            description: input.description,
+            price: input.price,
+            image: input.image,
+            weight: input.weight,
+            type: {
+              connect:{
+                id: input.type
+              }
+            },
+          }
         })
     }),
       update: protectedProcedure
@@ -49,6 +60,7 @@ import {
         price:z.number().min(0).positive({message:"Price amount must be positive..."}),
         image:z.string().optional(),
         type:z.string(),
+        weight: z.string()
       }))
       .mutation(({ctx, input}) => {
         return ctx.db.product.update({
@@ -60,16 +72,24 @@ import {
               description: input.description,
               price: input.price,
               image: input.image,
-              type: input.type,
+              weight: input.weight,
+              type: {
+                connect:{
+                  id: input.type
+                }
+              },
             }
         })
     }),
     delete:protectedProcedure
     .input(z.string())
     .mutation(({ctx, input}) => {
-      return ctx.db.product.delete({
+      return ctx.db.product.update({
         where:{
           id:input
+        },
+        data:{
+          deletedAt: new Date()
         }
       })
     }),

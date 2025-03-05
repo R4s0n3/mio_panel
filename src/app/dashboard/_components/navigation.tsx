@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRightStartOnRectangleIcon, BeakerIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, DocumentCurrencyEuroIcon, Squares2X2Icon, UserCircleIcon } from "@heroicons/react/24/solid"
+import { ArrowRightStartOnRectangleIcon, BeakerIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, CubeIcon, DocumentCurrencyEuroIcon, Squares2X2Icon, TagIcon, TruckIcon, UserCircleIcon } from "@heroicons/react/24/solid"
 import Link from "next/link"
 import { useState } from "react"
 
@@ -21,6 +21,9 @@ export default function Navigation () {
             <li className="transition duration-500 hover:text-highlight-cyan"><Link href="/dashboard" className="flex gap-3 items-center text-xl"><Squares2X2Icon className="size-6" /> Dashboard</Link></li>
             <li className="transition duration-500 hover:text-highlight-cyan"><Link href="/dashboard/projects" className="flex gap-3 items-center text-xl"><BeakerIcon className="size-6" /> Projects</Link></li>
             <li className="transition duration-500 hover:text-highlight-cyan"><Link href="/dashboard/products" className="flex gap-2 items-center text-xl "><DocumentCurrencyEuroIcon className="size-6" /> Products</Link></li>
+            <li className="transition duration-500 hover:text-highlight-cyan"><Link href="/dashboard/product-types" className="flex gap-2 items-center text-xl "><TagIcon className="size-6" /> Product Types</Link></li>
+            <li className="transition duration-500 hover:text-highlight-cyan"><Link href="/dashboard/orders" className="flex gap-2 items-center text-xl "><TruckIcon className="size-6" /> Orders</Link></li>
+            <li className="transition duration-500 hover:text-highlight-cyan"><Link href="/dashboard/parcels" className="flex gap-2 items-center text-xl "><CubeIcon className="size-6" /> Parcels</Link></li>
         </ul>
         </div>
         <div className={`flex flex-col gap-4 w-full ${isOpen ? "" : "hidden"}`}>

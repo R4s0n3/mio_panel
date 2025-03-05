@@ -4,31 +4,43 @@ import { api } from "@/trpc/react"
 import LoadingSpinner from "@/app/_components/loading-spinner"
 import { useState, useEffect } from "react"
 
-import { CloudArrowUpIcon, TrashIcon } from "@heroicons/react/24/solid"
+import { CloudArrowUpIcon, TrashIcon} from "@heroicons/react/24/solid"
 import { useRouter } from "next/navigation"
 
 interface ProductInputs{
     name: string
     type: string
     description?: string | null
-    price: number
+    price: number,
+    weight: string,
     image?: string | null
 }
 
 type ProductFormProps = {
-    existingProduct?: ProductInputs & {
-      id: string
-    } 
+    productId?: string
 }
 
 export default function ProductForm(props:ProductFormProps){
     const router = useRouter()
+    const [existingTypes] = api.type.getAll.useSuspenseQuery()
+    const [existingProduct] = api.product.fromParams.useSuspenseQuery(props.productId ?? "")
+
+  const formattedProduct = {
+    name: existingProduct?.name ?? "",
+    type: existingProduct?.type.id ?? "",
+    description: existingProduct?.description,
+    price: existingProduct?.price ?? 0,
+    weight: existingProduct?.weight ?? "",
+    image: existingProduct?.image
+  }
+
     const {control, register, reset, handleSubmit} = useForm({
-        defaultValues:props.existingProduct
+        defaultValues: existingProduct ? formattedProduct : {}
     })
 
     const [deleteMode, setDeleteMode] = useState(false)
     const [displayPrice, setDisplayPrice] = useState<string>('');
+
 
     const utils = api.useUtils()
     const createProduct = api.product.create.useMutation({
@@ -49,16 +61,18 @@ export default function ProductForm(props:ProductFormProps){
         router.push("/dashboard/products")
       }
     })
+
     const onSubmit: SubmitHandler<ProductInputs> = (data) => {
 
-        if(props.existingProduct?.id){
+        if(existingProduct?.id){
             const productData = {
-                id: props.existingProduct.id,
+                id: existingProduct.id,
                 name: data.name,
                 description: data.description ?? "",
                 type: data.type,
                 price: data.price ?? 0,
-                image: data.image ?? ""
+                image: data.image ?? "",
+                weight: data.weight
             }
             updateProduct.mutate(productData)
         }else{
@@ -67,7 +81,8 @@ export default function ProductForm(props:ProductFormProps){
                 description: data.description ?? "",
                 type: data.type,
                 price: data.price ?? 0,
-                image: data.image ?? ""
+                image: data.image ?? "",
+                weight: data.weight
             }
             createProduct.mutate(productData)
         }
@@ -90,12 +105,15 @@ export default function ProductForm(props:ProductFormProps){
   // effect to initialize the displayPrice from the default price value
   useEffect(() => {
     // Initialize with the default price (you could also get this from a prop/state)
-    setDisplayPrice(formatCentsToDisplay(props.existingProduct?.price ?? 0));
-  }, [props.existingProduct?.price]);
+    if (existingProduct) {
+      setDisplayPrice(formatCentsToDisplay(existingProduct.price ?? 0));
+    }
+    
+  }, [existingProduct]);
 
   function handleDeleteProduct(){
-    if(!props.existingProduct) return null
-    deleteProduct.mutate(props.existingProduct.id)
+    if(!existingProduct) return null
+    deleteProduct.mutate(existingProduct.id)
   }
   
     if (createProduct.isPending || updateProduct.isPending) return <LoadingSpinner />
@@ -109,7 +127,7 @@ export default function ProductForm(props:ProductFormProps){
       </div>
       </div>
     </div>
-    return  <form  onSubmit={handleSubmit(onSubmit)}  className="gap-4 flex flex-col lg:flex-row">
+    return  <form onSubmit={handleSubmit(onSubmit)}  className="gap-4 flex flex-col lg:flex-row">
     <div className="bg-primary-800 p-4 rounded flex-[2]">
 <div className="flex flex-col gap-8 h-full w-full">
 <h2 className="text-4xl font-subhead">PRODUCT INFO</h2>
@@ -148,7 +166,7 @@ export default function ProductForm(props:ProductFormProps){
       />
     </div>
     <div className="mt-auto">
-    <button type="submit"  className="p-4 px-8 bg-secondary-900/80 hover:bg-secondary-900 transition duration-500 rounded">{props.existingProduct ? "UPDATE PRODUCT" : "ADD PRODUCT"}</button>
+    <button type="submit"  className="p-4 px-8 bg-secondary-900/80 hover:bg-secondary-900 transition duration-500 rounded">{existingProduct?.id ? "UPDATE PRODUCT" : "ADD PRODUCT"}</button>
     </div>
 </div>
     </div>
@@ -156,8 +174,13 @@ export default function ProductForm(props:ProductFormProps){
     <div><h2 className="text-4xl font-subhead">SETTINGS</h2></div>
     <div className="flex flex-col gap-2">
     <label className="text-xl text-headings">Type</label>
-    <input className="bg-headings/50 rounded p-2 text-3xl placeholder:text-secondary-800" {...register("type")} placeholder="Product type" />
-
+    <select className="bg-headings/50 rounded p-2 text-3xl placeholder:text-secondary-800" defaultValue={existingTypes[0]?.id} {...register("type", {required:true})}>
+        {existingTypes?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+    </select>
+</div>
+    <div className="flex flex-col gap-2">
+    <label className="text-xl text-headings">Weight</label>
+    <input className="bg-headings/50 rounded p-2 text-3xl placeholder:text-secondary-800" {...register("weight")} placeholder="estm. product weight" />
 </div>
         <div><h2 className="text-4xl font-subhead">PRODUCT IMAGE</h2></div>
        <div className="flex flex-col h-full gap-4">  
@@ -170,7 +193,7 @@ export default function ProductForm(props:ProductFormProps){
     </div>
             </div>
             <div>
-    {props.existingProduct && <div><button onClick={() => setDeleteMode(true)} type="button" className="flex gap-4 bg-highlight-magenta rounded p-2 px-4 justify-center items-center"><TrashIcon className="size-6" /> Delete Product</button></div>}
+    {existingProduct && <div><button onClick={() => setDeleteMode(true)} type="button" className="flex gap-4 bg-highlight-magenta rounded p-2 px-4 justify-center items-center"><TrashIcon className="size-6" /> Delete Product</button></div>}
     </div>
     </div>
    </form>

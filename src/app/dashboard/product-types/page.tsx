@@ -2,16 +2,13 @@ import { auth } from "@/server/auth";
 import { api, HydrateClient } from "@/trpc/server";
 import LoginPage from "@/app/_components/login-page";
 import Navigation from "../_components/navigation";
-import Link from "next/link";
-import { PlusIcon } from "@heroicons/react/24/solid";
-import ProductsGrid from "./_components/products-grid";
+import TypesGrid from "./_components/types-grid";
 
-export default async function Products() {
+export default async function ProductTypes() {
 
     const session = await auth();
-
-    void api.product.getAll.prefetch()
     void api.type.getAll.prefetch()
+    
     if(!session){
         return <LoginPage />
     }  
@@ -22,8 +19,8 @@ return (
        <Navigation />
        <div className="flex-1 pb-8">
         <div className="w-full flex flex-col gap-8 p-4">
-       <h1 className="text-5xl text-highlight-cyan font-headline">Products</h1>
-      <ProductsGrid />
+       <h1 className="text-5xl text-highlight-cyan font-headline">Product Types</h1>
+      <TypesGrid />
         </div>
        </div>
     </main>

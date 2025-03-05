@@ -5,6 +5,7 @@ import DiscordProvider from "next-auth/providers/discord";
 import { db } from "@/server/db";
 import type { MioRole } from "@prisma/client";
 
+
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -47,7 +48,7 @@ export const authConfig = {
   adapter: PrismaAdapter(db),
   callbacks: {
     async signIn({user}) {
-      const allowedEmails = ['pascal@miomideal.com', 'achim@miomideal.com'];
+      const allowedEmails = ['pascal@miomideal.com', 'heinachim@gmx.de'];
       if(!user.email) return false
       return allowedEmails.includes(user.email);
     },

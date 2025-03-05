@@ -4,7 +4,11 @@ import { postRouter } from "./routers/post";
 import { projectRouter } from "./routers/project";
 import { contactRouter } from "./routers/contact";
 import { userRouter } from "./routers/user";
+import { typeRouter } from "./routers/type";
 import { productRouter } from "./routers/product";
+import { parcelRouter } from "./routers/parcel";
+import { orderRouter } from "./routers/order";
+
 /**
  * This is the primary router for your server.
  *
@@ -14,9 +18,12 @@ export const appRouter = createTRPCRouter({
   plugin: pluginRouter,
   post: postRouter,
   user: userRouter,
+  parcel: parcelRouter,
+  type: typeRouter,
   project: projectRouter,
   contact: contactRouter,
-  product:productRouter
+  product:productRouter,
+  order: orderRouter
 });
 
 // export type definition of API
