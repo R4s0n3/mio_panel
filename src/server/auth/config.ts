@@ -46,10 +46,11 @@ export const authConfig = {
      */
   ],
   adapter: PrismaAdapter(db),
+  trustHost: true,
   callbacks: {
-    async signIn({user}) {
+    async signIn({ user }) {
       const allowedEmails = ['pascal@miomideal.com', 'heinachim@gmx.de'];
-      if(!user.email) return false
+      if (!user.email) return false
       return allowedEmails.includes(user.email);
     },
     session: ({ session, user }) => ({
