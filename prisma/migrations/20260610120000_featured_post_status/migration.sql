@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TABLE `Post` MODIFY `status` ENUM('PUBLIC', 'FEATURED', 'HIDDEN', 'DRAFT') NOT NULL;

@@ -212,6 +212,7 @@ enum PostType {
 
 enum PostStatus {
   PUBLIC
+  FEATURED
   HIDDEN
   DRAFT
 }
