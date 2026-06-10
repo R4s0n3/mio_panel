@@ -1,30 +1,40 @@
 import { auth } from "@/server/auth";
-import { HydrateClient } from "@/trpc/server";
+import { api, HydrateClient } from "@/trpc/server";
 import LoginPage from "@/app/_components/login-page";
 import Navigation from "../../_components/navigation";
 import ProductForm from "./_components/product-form";
 
-
-
 export default async function CreateProduct() {
+  const session = await auth();
 
-    const session = await auth();
+  if (!session) {
+    return <LoginPage />;
+  }
+  if (session.user.role !== "ADMIO") {
+    return (
+      <main className="flex min-h-screen flex-col bg-gradient-to-b from-primary-700 to-primary-900 text-headings lg:flex-row">
+        you are not allowed to see this content.
+      </main>
+    );
+  }
 
-if(!session){
-    return <LoginPage />
-}
+  void api.product.fromParams.prefetch("");
+  void api.type.getAll.prefetch();
+  void api.media.getProductImages.prefetch();
 
-return (
+  return (
     <HydrateClient>
-    <main className="flex min-h-screen flex-col lg:flex-row  bg-primary-700  text-headings">
-       <Navigation />
-       <div className="flex-1 h-screen overflow-y-auto">
-        <div className="w-full flex flex-col gap-12 p-4 pb-8">
-       <h1 className="text-5xl text-headings font-headline p-4 italic">Products // New</h1>
-       <ProductForm />
+      <main className="flex min-h-screen flex-col bg-primary-700 text-headings lg:flex-row">
+        <Navigation />
+        <div className="h-screen flex-1 overflow-y-auto">
+          <div className="flex w-full flex-col gap-12 p-4 pb-8">
+            <h1 className="p-4 font-headline text-5xl italic text-headings">
+              Products // New
+            </h1>
+            <ProductForm />
+          </div>
         </div>
-       </div>
-    </main>
+      </main>
     </HydrateClient>
   );
 }

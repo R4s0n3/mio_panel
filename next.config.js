@@ -6,17 +6,19 @@ import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
 const config = {
-    images:{
-        remotePatterns: [
-            {
-              protocol: 'https',
-              hostname: 'cdn.miomideal.com',
-              port: '',
-              pathname: '/assets/**',
-              search: '',
-            },
-          ],
-    }
+  output: "standalone",
+  images: {
+    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cdn.miomideal.com",
+        port: "",
+        pathname: "/assets/**",
+        search: "",
+      },
+    ],
+  },
 };
 
 export default config;
