@@ -9,6 +9,7 @@ import {
   ChevronUpIcon,
   CubeIcon,
   DocumentCurrencyEuroIcon,
+  MegaphoneIcon,
   Squares2X2Icon,
   TagIcon,
   TruckIcon,
@@ -28,6 +29,7 @@ const navItems = [
   },
   { href: "/dashboard/product-types", icon: TagIcon, label: "Product Types" },
   { href: "/dashboard/orders", icon: TruckIcon, label: "Orders" },
+  { href: "/dashboard/sponsors", icon: MegaphoneIcon, label: "Sponsors" },
   { href: "/dashboard/parcels", icon: CubeIcon, label: "Parcels" },
 ];
 

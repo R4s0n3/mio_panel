@@ -197,6 +197,45 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model SponsorSlot {
+  id           String            @id @default(cuid())
+  placement    SponsorPlacement? @unique
+  name         String
+  description  String?           @db.Text
+  basePrice    Int
+  minIncrement Int
+  enabled      Boolean           @default(true)
+  sortOrder    Int               @default(0)
+  currentBidId String?           @unique
+  currentBid   SponsorBid?       @relation("CurrentSponsorBid", fields: [currentBidId], references: [id], onDelete: SetNull)
+  bids         SponsorBid[]      @relation("SponsorSlotBids")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SponsorBid {
+  id                    String           @id @default(cuid())
+  slotId                String
+  slot                  SponsorSlot      @relation("SponsorSlotBids", fields: [slotId], references: [id], onDelete: Cascade)
+  activeForSlot         SponsorSlot?     @relation("CurrentSponsorBid")
+  advertiserName        String
+  advertiserEmail       String
+  websiteUrl            String
+  logoUrl               String
+  amount                Int
+  status                SponsorBidStatus @default(PENDING)
+  stripeSessionId       String?          @unique
+  stripePaymentIntentId String?          @unique
+  paidAt                DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slotId, status])
+  @@index([createdAt])
+}
+
 enum MioRole {
   ADMIO
   GORLAMI
@@ -230,4 +269,22 @@ enum OrderStatus {
   RETURNED // The customer has returned the order, and it is being processed
   EXCHANGED // The customer has exchanged the order for a different item
   ON_HOLD // The order is on hold for some reason, such as payment verification or stock issues
+}
+
+enum SponsorBidStatus {
+  PENDING
+  ACTIVE
+  OUTBID
+  CANCELLED
+  REMOVED
+  REFUNDED
+}
+
+enum SponsorPlacement {
+  HERO_BILLBOARD
+  PROJECTS_CORNER
+  PROJECTS_STRIP
+  ABOUT_SIDECAR
+  MERCH_BANNER
+  FOOTER_STAMP
 }
