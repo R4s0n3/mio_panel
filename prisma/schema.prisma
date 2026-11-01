@@ -17,6 +17,7 @@ datasource db {
 model Product {
   id           String         @id @default(cuid())
   image        String?
+  images       Json?
   detailImages ProductImage[]
   name         String
   description  String?        @db.Text

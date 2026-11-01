@@ -2,10 +2,15 @@
 
 import LoadingSpinner from "@/app/_components/loading-spinner";
 import { api } from "@/trpc/react";
+import { imageUrlError, parseProductImageUrls } from "@/util/product-images";
 import {
+  ChevronDownIcon,
+  ChevronUpIcon,
   CloudArrowUpIcon,
   PhotoIcon,
+  PlusIcon,
   TrashIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/solid";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -54,6 +59,60 @@ function readFileAsDataUrl(file: File) {
   });
 }
 
+function usesPanelImage(url: string) {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.hostname === "cdn.miomideal.com" &&
+      parsed.pathname.startsWith("/assets/")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function ExtraImagePreview({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = imageUrlError(url) === null && !failed;
+
+  useEffect(() => {
+    setFailed(false);
+  }, [url]);
+
+  if (!showImage) {
+    return (
+      <div className="flex size-full items-center justify-center text-headings/40">
+        <PhotoIcon className="size-6" />
+      </div>
+    );
+  }
+
+  if (usesPanelImage(url)) {
+    return (
+      <Image
+        src={url}
+        alt=""
+        fill
+        className="object-cover"
+        sizes="64px"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  return (
+    // URLs are validated, but they are not limited to the Next image allowlist.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      className="size-full object-cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export default function ProductForm(props: ProductFormProps) {
   const router = useRouter();
   const [existingTypes] = api.type.getAll.useSuspenseQuery();
@@ -81,6 +140,10 @@ export default function ProductForm(props: ProductFormProps) {
   const [selectedDetailImageIds, setSelectedDetailImageIds] = useState<
     string[]
   >(existingProduct?.detailImages.map((image) => image.id) ?? []);
+  const [extraImages, setExtraImages] = useState<string[]>(() =>
+    parseProductImageUrls(existingProduct?.images),
+  );
+  const [imageErrors, setImageErrors] = useState<Record<number, string>>({});
   const mainImage = watch("image");
 
   const utils = api.useUtils();
@@ -103,21 +166,7 @@ export default function ProductForm(props: ProductFormProps) {
     },
   });
 
-  const uploadImages = api.media.upload.useMutation({
-    onSuccess: async (uploadedImages) => {
-      await utils.media.getProductImages.invalidate();
-
-      const uploadedIds = uploadedImages.map((image) => image.id);
-      if (uploadedIds.length > 0) {
-        syncDetailImages([...selectedDetailImageIds, ...uploadedIds]);
-      }
-
-      const primaryImage = uploadedImages[0];
-      if (primaryImage && !mainImage) {
-        setValue("image", primaryImage.imageUrl, { shouldDirty: true });
-      }
-    },
-  });
+  const uploadImages = api.media.upload.useMutation();
 
   useEffect(() => {
     if (!existingProduct) return;
@@ -135,6 +184,8 @@ export default function ProductForm(props: ProductFormProps) {
       details: nextDetailImages,
     });
     setSelectedDetailImageIds(nextDetailImages);
+    setExtraImages(parseProductImageUrls(existingProduct.images));
+    setImageErrors({});
     setDisplayPrice(formatCentsToDisplay(existingProduct.price ?? 0));
   }, [existingProduct, reset]);
 
@@ -153,7 +204,54 @@ export default function ProductForm(props: ProductFormProps) {
     syncDetailImages([...selectedDetailImageIds, imageId]);
   }
 
-  async function handleUpload(files: FileList | null) {
+  function updateExtraImage(index: number, value: string) {
+    setExtraImages((current) =>
+      current.map((url, imageIndex) => (imageIndex === index ? value : url)),
+    );
+    setImageErrors((current) => {
+      if (current[index] === undefined) return current;
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+  }
+
+  function moveExtraImage(index: number, direction: -1 | 1) {
+    setExtraImages((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+
+      const next = [...current];
+      const [moved] = next.splice(index, 1);
+      if (moved === undefined) return current;
+      next.splice(nextIndex, 0, moved);
+      return next;
+    });
+    setImageErrors({});
+  }
+
+  function removeExtraImage(index: number) {
+    setExtraImages((current) =>
+      current.filter((_, imageIndex) => imageIndex !== index),
+    );
+    setImageErrors({});
+  }
+
+  function extraImageErrors(urls: string[]) {
+    const errors: Record<number, string> = {};
+
+    urls.forEach((url, index) => {
+      const message = imageUrlError(url);
+      if (message) errors[index] = message;
+    });
+
+    return errors;
+  }
+
+  async function handleUpload(
+    files: FileList | null,
+    mode: "cover" | "extras",
+  ) {
     const imageFiles = Array.from(files ?? []).filter((file) =>
       file.type.startsWith("image/"),
     );
@@ -167,16 +265,51 @@ export default function ProductForm(props: ProductFormProps) {
       })),
     );
 
-    uploadImages.mutate({ files: uploadPayload });
+    let uploadedImages;
+    try {
+      uploadedImages = await uploadImages.mutateAsync({
+        files: uploadPayload,
+      });
+    } catch {
+      return;
+    }
+
+    await utils.media.getProductImages.invalidate();
+
+    if (mode === "extras") {
+      const uploadedUrls = uploadedImages
+        .map((image) => image.imageUrl)
+        .filter((url) => imageUrlError(url) === null);
+      setExtraImages((current) => [...current, ...uploadedUrls]);
+      setImageErrors({});
+      return;
+    }
+
+    const uploadedIds = uploadedImages.map((image) => image.id);
+    if (uploadedIds.length > 0) {
+      syncDetailImages([...selectedDetailImageIds, ...uploadedIds]);
+    }
+
+    const primaryImage = uploadedImages[0];
+    if (primaryImage && !mainImage) {
+      setValue("image", primaryImage.imageUrl, { shouldDirty: true });
+    }
   }
 
   const onSubmit: SubmitHandler<ProductInputs> = (data) => {
+    const errors = extraImageErrors(extraImages);
+    if (Object.keys(errors).length > 0) {
+      setImageErrors(errors);
+      return;
+    }
+
     const productData = {
       name: data.name,
       description: data.description ?? "",
       type: data.type,
       price: data.price ?? 0,
       image: data.image ?? "",
+      images: extraImages.map((url) => url.trim()),
       weight: data.weight ?? "",
       details: selectedDetailImageIds,
     };
@@ -344,7 +477,7 @@ export default function ProductForm(props: ProductFormProps) {
                   accept="image/png,image/jpeg,image/jpg,image/webp"
                   multiple
                   onChange={(event) => {
-                    void handleUpload(event.currentTarget.files);
+                    void handleUpload(event.currentTarget.files, "cover");
                     event.currentTarget.value = "";
                   }}
                 />
@@ -353,6 +486,107 @@ export default function ProductForm(props: ProductFormProps) {
             {uploadImages.isPending && (
               <p className="text-sm text-body/80">Uploading images...</p>
             )}
+            {uploadImages.error && (
+              <p className="text-sm text-highlight-magenta">
+                Upload failed. Paste a CDN URL or try again.
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label className="text-xl text-headings">Extra Images</label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExtraImages((current) => [...current, ""]);
+                    setImageErrors({});
+                  }}
+                  className="inline-flex items-center gap-1 rounded bg-secondary-900/80 px-2 py-1 text-sm transition duration-500 hover:bg-secondary-900"
+                >
+                  <PlusIcon className="size-4" />
+                  Add URL
+                </button>
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded bg-secondary-900/80 px-2 py-1 text-sm transition duration-500 hover:bg-secondary-900">
+                  <CloudArrowUpIcon className="size-4" />
+                  Upload
+                  <input
+                    className="hidden"
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    multiple
+                    onChange={(event) => {
+                      void handleUpload(event.currentTarget.files, "extras");
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+            <p className="text-sm text-body/80">
+              Additional photos, in display order. Cover stays the image above.
+              Hosted files use https://cdn.miomideal.com/assets/.
+            </p>
+            <div className="flex flex-col gap-3">
+              {extraImages.map((url, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <div className="relative size-14 shrink-0 overflow-hidden rounded bg-surface">
+                    <ExtraImagePreview url={url} />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <input
+                      className="w-full rounded bg-headings/50 p-2 text-sm placeholder:text-secondary-800"
+                      value={url}
+                      onChange={(event) =>
+                        updateExtraImage(index, event.target.value)
+                      }
+                      placeholder="https://cdn.miomideal.com/assets/..."
+                      aria-label={`Extra image URL ${index + 1}`}
+                      aria-invalid={imageErrors[index] !== undefined}
+                    />
+                    {imageErrors[index] && (
+                      <p className="text-sm text-highlight-magenta">
+                        {imageErrors[index]}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => moveExtraImage(index, -1)}
+                      disabled={index === 0}
+                      aria-label="Move image earlier"
+                      className="rounded bg-primary-900/60 p-2 disabled:opacity-30"
+                    >
+                      <ChevronUpIcon className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveExtraImage(index, 1)}
+                      disabled={index === extraImages.length - 1}
+                      aria-label="Move image later"
+                      className="rounded bg-primary-900/60 p-2 disabled:opacity-30"
+                    >
+                      <ChevronDownIcon className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeExtraImage(index)}
+                      aria-label="Remove extra image"
+                      className="rounded bg-highlight-magenta/80 p-2"
+                    >
+                      <XMarkIcon className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {extraImages.length === 0 && (
+                <div className="rounded bg-surface p-4 text-center text-sm text-body/80">
+                  No extra images yet.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col gap-2">
