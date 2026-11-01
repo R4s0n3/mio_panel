@@ -41,7 +41,8 @@ export default async function uploadFiles(files: UploadInput[]): Promise<FileIte
   }
 
   const isBulk = files.length > 1
-  const endpoint = `${UPLOAD_URL}${isBulk ? "bulk" : "single"}`
+  const uploadBase = UPLOAD_URL.endsWith("/") ? UPLOAD_URL : `${UPLOAD_URL}/`
+  const endpoint = new URL(isBulk ? "bulk" : "single", uploadBase).toString()
   const formData = createUploadFormData(files)
   let response: Response
 
@@ -106,7 +107,7 @@ function normalizeUploadResponse(response: UploadResponse): FileItem[] {
   return filesArray.map((file) => ({
     size: file.size,
     name: file.originalName ?? file.fileName,
-    src: file.url,
+    src: new URL(file.url, new URL(UPLOAD_URL).origin).toString(),
     type: getFileType(file.mimetype),
   }));
 }
