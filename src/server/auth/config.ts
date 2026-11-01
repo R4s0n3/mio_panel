@@ -34,7 +34,14 @@ declare module "next-auth" {
  */
 export const authConfig = {
   providers: [
-    DiscordProvider,
+    // Discord sends RFC 9207 `iss=https://discord.com` on the OAuth callback.
+    // Auth.js otherwise checks it against the placeholder https://authjs.dev
+    // and rejects the sign-in. Token and userinfo URLs stay absolute, so this
+    // does not turn on OpenID discovery. next-auth@5.0.0-beta.32 still lacks
+    // the issuer (nextauthjs/next-auth#13504).
+    DiscordProvider({
+      issuer: "https://discord.com",
+    }),
     /**
      * ...add more providers here.
      *
