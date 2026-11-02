@@ -8,6 +8,7 @@ import {
   ChevronRightIcon,
   ChevronUpIcon,
   CubeIcon,
+  PhotoIcon,
   DocumentCurrencyEuroIcon,
   MegaphoneIcon,
   Squares2X2Icon,
@@ -21,6 +22,7 @@ import { useState } from "react";
 
 const navItems = [
   { href: "/dashboard", icon: Squares2X2Icon, label: "Dashboard" },
+  { href: "/dashboard/media", icon: PhotoIcon, label: "Media" },
   { href: "/dashboard/projects", icon: BeakerIcon, label: "Projects" },
   {
     href: "/dashboard/products",
