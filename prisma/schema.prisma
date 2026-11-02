@@ -205,9 +205,11 @@ model SponsorSlot {
   description  String?           @db.Text
   basePrice    Int
   minIncrement Int
-  enabled      Boolean           @default(true)
-  sortOrder    Int               @default(0)
-  currentBidId String?           @unique
+  enabled      Boolean            @default(true)
+  sortOrder    Int                @default(0)
+  pricingMode  SponsorPricingMode @default(AUCTION)
+  durationDays Int?
+  currentBidId String?            @unique
   currentBid   SponsorBid?       @relation("CurrentSponsorBid", fields: [currentBidId], references: [id], onDelete: SetNull)
   bids         SponsorBid[]      @relation("SponsorSlotBids")
 
@@ -229,6 +231,7 @@ model SponsorBid {
   stripeSessionId       String?          @unique
   stripePaymentIntentId String?          @unique
   paidAt                DateTime?
+  expiresAt             DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -279,6 +282,11 @@ enum SponsorBidStatus {
   CANCELLED
   REMOVED
   REFUNDED
+}
+
+enum SponsorPricingMode {
+  AUCTION
+  FIXED
 }
 
 enum SponsorPlacement {
