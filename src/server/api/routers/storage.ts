@@ -1,3 +1,4 @@
+import { mediaFileMimeType } from "@/util/media-files";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -103,15 +104,16 @@ export const storageRouter = createTRPCRouter({
           !(file instanceof File) ||
           file.size === 0 ||
           file.size > 50 * 1024 * 1024 ||
-          !["image/jpeg", "image/png", "application/pdf"].includes(file.type)
+          !mediaFileMimeType(file)
         ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Choose a JPEG, PNG, or PDF between 1 byte and 50 MB.",
+            message:
+              "Choose a JPEG, PNG, PDF, or ZIP between 1 byte and 50 MB.",
           });
           return z.NEVER;
         }
-        return file;
+        return new File([file], file.name, { type: mediaFileMimeType(file) });
       }),
     )
     .mutation(async ({ input }) => {

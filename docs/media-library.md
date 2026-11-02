@@ -15,7 +15,7 @@ The API lists active file metadata owned by this API key, including previous upl
 Files placed directly in the bucket without CDN metadata do not appear.
 
 Multipart uploads go through an authenticated tRPC mutation, then the panel server
-forwards the original file to the CDN. JPEG, PNG, and PDF are supported, up to 50 MB
+forwards the original file to the CDN. JPEG, PNG, PDF, and ZIP are supported, up to 50 MB
 per file. Hosting/proxy request limits must also allow the desired upload size;
 platforms with a smaller fixed request limit require a future direct-upload flow.
 The panel API uses Node's File/FormData APIs, so run Node 20 or newer.

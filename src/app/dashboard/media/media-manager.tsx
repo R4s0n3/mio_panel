@@ -1,5 +1,7 @@
 "use client";
 
+import { mediaFileMimeType } from "@/util/media-files";
+
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { api, type RouterOutputs } from "@/trpc/react";
@@ -62,14 +64,12 @@ export function MediaManager() {
         setResults([...queue]);
         try {
           if (
-            !["image/jpeg", "image/png", "application/pdf"].includes(
-              file.type,
-            ) ||
+            !mediaFileMimeType(file) ||
             file.size === 0 ||
             file.size > 50 * 1024 * 1024
           ) {
             throw new Error(
-              "Use a JPEG, PNG, or PDF between 1 byte and 50 MB.",
+              "Use a JPEG, PNG, PDF, or ZIP between 1 byte and 50 MB.",
             );
           }
           const form = new FormData();
@@ -134,13 +134,13 @@ export function MediaManager() {
       >
         <h2 className="font-subhead text-xl">Drop files here</h2>
         <p className="my-3 text-sm text-body/60">
-          JPEG, PNG, or PDF · Up to 50 MB per file · Public permalinks
+          JPEG, PNG, PDF, or ZIP · Up to 50 MB per file · Public permalinks
         </p>
         <input
           ref={input}
           type="file"
           multiple
-          accept="image/jpeg,image/png,application/pdf"
+          accept="image/jpeg,image/png,application/pdf,.zip,application/zip,application/x-zip-compressed"
           className="hidden"
           aria-label="Choose media files"
           disabled={uploading}
@@ -259,7 +259,7 @@ export function MediaManager() {
                   />
                 ) : (
                   <span className="font-subhead text-3xl text-body/40">
-                    PDF
+                    {file.mimeType === "application/pdf" ? "PDF" : "ZIP"}
                   </span>
                 )}
               </div>
