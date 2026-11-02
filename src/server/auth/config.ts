@@ -5,7 +5,6 @@ import DiscordProvider from "next-auth/providers/discord";
 import { db } from "@/server/db";
 import type { MioRole } from "@prisma/client";
 
-
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -20,11 +19,6 @@ declare module "next-auth" {
       role: MioRole;
     } & DefaultSession["user"];
   }
-
-  // interface User {
-  //   // ...other properties
-  //   // role: UserRole;
-  // }
 }
 
 /**
@@ -56,16 +50,22 @@ export const authConfig = {
   trustHost: true,
   callbacks: {
     async signIn({ user }) {
-      const allowedEmails = ['pascal@miomideal.com', 'heinachim@gmx.de'];
-      if (!user.email) return false
-      return allowedEmails.includes(user.email);
+      return user.email === "pascal@miomideal.com";
     },
-    session: ({ session, user }) => ({
-      ...session,
-      user: {
-        ...session.user,
-        id: user.id,
-      },
-    }),
+    session: async ({ session, user }) => {
+      const account = await db.user.findUnique({
+        where: { id: user.id },
+        select: { role: true },
+      });
+
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: user.id,
+          role: account?.role ?? "LOSER",
+        },
+      };
+    },
   },
 } satisfies NextAuthConfig;

@@ -1,3 +1,4 @@
+import { storageRouter } from "./routers/storage";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 import { pluginRouter } from "./routers/plugin";
 import { postRouter } from "./routers/post";
@@ -27,6 +28,7 @@ export const appRouter = createTRPCRouter({
   product: productRouter,
   order: orderRouter,
   media: mediaRouter,
+  storage: storageRouter,
   sponsor: sponsorRouter,
 });
 
