@@ -34,8 +34,8 @@ export default async function SponsorsPage() {
                 </h1>
               </div>
               <p className="max-w-lg font-text text-sm text-body/55 sm:text-right">
-                Configure public placements, pricing steps, and the sponsor
-                currently holding each spot.
+                Set auction or fixed pricing, the spot price, and how many days
+                a booking lasts. Place a sponsor by hand when you need to.
               </p>
             </header>
             <SponsorsManager />
