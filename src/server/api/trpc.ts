@@ -124,6 +124,12 @@ export const protectedProcedure = t.procedure
     if (!ctx.session || !ctx.session.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
+    if (
+      ctx.session.user.email !== "pascal@miomideal.com" ||
+      ctx.session.user.role !== "ADMIO"
+    ) {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
     return next({
       ctx: {
         // infers the `session` as non-nullable
