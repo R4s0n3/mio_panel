@@ -8,17 +8,14 @@ Dashboard uploads are private by default. Drop JPEG, PNG, PDF, or ZIP files up t
 50 MB each. Common ZIP MIME aliases and extension fallbacks are handled. Each
 upload gets a separate result, so one failure does not discard successful uploads.
 
-Private originals live in the CDN's non-public persistent storage, outside the
-public `/storage` and `/assets` folders. The authenticated owner can preview or
+Private originals live in S3, under a private namespace whose anonymous reads and listings are checked before upload. The authenticated owner can preview or
 download them through the panel. Knowledge of a filename or database ID does not
 grant anonymous read access. The panel confirms CDN private-media capability
 before sending file bytes, and never sends its CDN key to the browser.
 
 Existing public files are explicitly marked Public. **Make private** moves a
 selected legacy file to the private storage area and removes its public origin
-copy after confirmation. Moving a website/sponsor asset can break its public
-links; do this only for files you intend to restrict. Recreate share links after
-moving a file because the previous file revision becomes unavailable. Previously
+copy after confirmation. Moving a website/sponsor asset can break its public links; do this only for files you intend to restrict. Storage-only moves preserve the content revision and existing share links. Previously
 cached or downloaded public copies cannot be withdrawn.
 
 ## Share selected files with clients
@@ -60,9 +57,7 @@ images. The CDN provides no anonymous file-listing API or directory index.
 
 Deploy CDN main first, then panel main. The CDN migration entrypoint adds
 File.isPublic (default true for legacy records), MediaShare, and MediaShareFile.
-No panel schema changes or new credentials are needed. Keep the existing CDN
-SERVER_ROOT volume persistent; private client uploads use SERVER_ROOT/private
-even when public files use S3, avoiding accidental public-bucket exposure.
+No panel schema changes or new credentials are needed. Private uploads use S3 exclusively, with local disk used only for temporary processing. The existing S3 connection and bucket are reused when they pass anonymous-access checks. Set S3_PRIVATE_BUCKET to another private bucket if needed; a separate bucket is required when S3_PUBLIC_BASE_URL is configured. Legacy private disk files show Move to S3; migrate those before removing their old volume.
 
 The panel uses existing server-only UPLOAD_URL (such as
 https://cdn.example.com/api/upload/) and UPLOAD_KEY matching CDN_API_KEY. Run Node

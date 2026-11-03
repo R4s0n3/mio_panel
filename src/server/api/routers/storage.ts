@@ -14,6 +14,7 @@ const storedFile = z.object({
   url: z.string(),
   createdAt: z.string(),
   isPublic: z.boolean().default(true),
+  needsS3Migration: z.boolean().default(false),
 });
 const uploadResponse = z.object({
   files: z.array(
@@ -197,7 +198,7 @@ export const storageRouter = createTRPCRouter({
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message:
-            "Deploy the CDN private-media update before uploading client files.",
+            "Private S3 storage is unavailable. Check the CDN S3 settings and bucket privacy.",
         });
       }
       const form = new FormData();

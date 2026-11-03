@@ -251,8 +251,10 @@ export function MakePrivateDialog({
   error,
   onCancel,
   onConfirm,
+  migrateOnly = false,
 }: {
   name: string;
+  migrateOnly?: boolean;
   busy: boolean;
   error?: string;
   onCancel: () => void;
@@ -274,13 +276,13 @@ export function MakePrivateDialog({
     >
       <div className="w-full max-w-md space-y-4 rounded-xl border border-highlight-cyan/30 bg-surface p-6">
         <h2 id="private-file-title" className="font-subhead text-xl">
-          Make this file private?
+          {migrateOnly ? "Move this file to S3?" : "Make this file private?"}
         </h2>
         <p className="break-words text-sm">{name}</p>
         <p className="text-sm text-body/60">
-          Its public origin link will stop working. Use this for client files;
-          moving website or sponsor images can break those pages. Create a new
-          share link afterward.
+          {migrateOnly
+            ? "Moves the existing private disk copy into verified private S3 storage. Existing share links keep working."
+            : "Its public origin link will stop working. Moving website or sponsor images can break those pages. The file will be stored in private S3 storage."}
         </p>
         <p className="text-xs text-body/50">
           Previously cached or downloaded copies cannot be withdrawn.
@@ -301,7 +303,7 @@ export function MakePrivateDialog({
             disabled={busy}
             onClick={onConfirm}
           >
-            {busy ? "Making private…" : "Make private"}
+            {busy ? "Moving…" : migrateOnly ? "Move to S3" : "Make private"}
           </button>
         </div>
         {error && (

@@ -53,9 +53,7 @@ export function MediaManager() {
       await makePrivate.mutateAsync({ id: privacyFile.id });
       setPrivacyFile(null);
       await utils.storage.list.invalidate();
-      setMessage(
-        "File is now private. Create a new share link for your client.",
-      );
+      setMessage("File is now stored privately in S3.");
     } catch {
       /* Mutation error is shown in the confirmation dialog. */
     }
@@ -384,7 +382,7 @@ export function MediaManager() {
                   >
                     Open file
                   </a>
-                  {file.isPublic && (
+                  {(file.isPublic || file.needsS3Migration) && (
                     <button
                       type="button"
                       className={buttonClass}
@@ -393,7 +391,7 @@ export function MediaManager() {
                         setPrivacyFile(file);
                       }}
                     >
-                      Make private
+                      {file.needsS3Migration ? "Move to S3" : "Make private"}
                     </button>
                   )}
                   <button
@@ -437,6 +435,7 @@ export function MediaManager() {
       )}
       {privacyFile && (
         <MakePrivateDialog
+          migrateOnly={privacyFile.needsS3Migration}
           name={privacyFile.originalName ?? privacyFile.fileName ?? "File"}
           busy={makePrivate.isPending}
           error={makePrivate.error?.message}
