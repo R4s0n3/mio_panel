@@ -1,54 +1,71 @@
-# Media library
+# Media library and client shares
 
-Open `/dashboard/media` or select **Media** in the panel navigation. An authorized
-panel administrator can drop several files, browse the library, search filenames,
-copy public CDN links, open files, and permanently delete files after confirmation.
-Each upload has its own result; a failure does not discard successful uploads.
+Open `/dashboard/media` or select **Media** in the panel navigation.
 
-## Configuration and deployment
+## Private client files
 
-The existing server variables `UPLOAD_URL` and `UPLOAD_KEY` are used. `UPLOAD_URL`
-should point to the CDN upload base, such as `https://cdn.example.com/api/upload/`.
-No API key is sent to the browser. No panel schema migration is needed for media.
-Deploy the CDN's authenticated `/api/upload/files` endpoints with this panel change.
-The API lists active file metadata owned by this API key, including previous uploads.
-Files placed directly in the bucket without CDN metadata do not appear.
+Dashboard uploads are private by default. Drop JPEG, PNG, PDF, or ZIP files up to
+50 MB each. Common ZIP MIME aliases and extension fallbacks are handled. Each
+upload gets a separate result, so one failure does not discard successful uploads.
 
-Multipart uploads go through an authenticated tRPC mutation, then the panel server
-forwards the original file to the CDN. JPEG, PNG, PDF, and ZIP are supported, up to 50 MB
-per file. Hosting/proxy request limits must also allow the desired upload size;
-platforms with a smaller fixed request limit require a future direct-upload flow.
-The panel API uses Node's File/FormData APIs, so run Node 20 or newer.
+Private originals live in the CDN's non-public persistent storage, outside the
+public `/storage` and `/assets` folders. The authenticated owner can preview or
+download them through the panel. Knowledge of a filename or database ID does not
+grant anonymous read access. The panel confirms CDN private-media capability
+before sending file bytes, and never sends its CDN key to the browser.
 
-Deletion removes the object before marking its metadata deleted, allowing retries
-if storage is unavailable. Public caches may retain copies until they expire.
-Product and sponsor records referencing a deleted URL are not modified.
+Existing public files are explicitly marked Public. **Make private** moves a
+selected legacy file to the private storage area and removes its public origin
+copy after confirmation. Moving a website/sponsor asset can break its public
+links; do this only for files you intend to restrict. Recreate share links after
+moving a file because the previous file revision becomes unavailable. Previously
+cached or downloaded public copies cannot be withdrawn.
 
-## Repository synchronization
+## Share selected files with clients
 
-`origin/main` was fetched for all four repositories. The panel, public page, and
-media center were updated while preserving their existing local changes. Conflicts
-were resolved to retain local invoice metadata, responsive cart changes, and the
-media center's newer dependency versions.
+1. Select up to 50 files using **Select for sharing**.
+2. Enter a share title and choose 1, 7, or 30 days (default 7).
+3. Choose **Create download link**, then copy the client link.
 
-The CDN's fetched `origin/main` introduces PostgreSQL, local disk storage, and an
-environment API key. Existing uncommitted work instead implements S3 storage with
-MySQL and database-owned API keys. The active CDN work retains that S3 setup;
-upstream CDN synchronization is pending a deliberate storage/database migration.
-The media endpoints in this change target the existing local S3 implementation.
-Backup stashes named `codex-before-media-sync` remain in repositories where needed.
+The public `/share/<token>` page lists only the selected files with individual
+download buttons and no panel sign-in required. Tokens are cryptographically
+random; only their hashes are stored. Copy the link when creating it; management
+history retains titles, expiry, status, and file counts rather than bearer tokens.
 
+Open **Manage shared links** to inspect expiry/status and revoke future access.
+Expiry, revocation, membership, deletion, and the file revision are checked on
+every download. Responses are streamed as attachments with no-store caching.
+Deleted/replaced files become unavailable through previous shares. Client pages
+are dynamic and excluded from indexing; production downloads require HTTPS.
 
-## Panel access
+Anyone with a share link can download until expiry/revocation. Already downloaded
+copies cannot be recalled. Sharing an older Public file does not invalidate its
+original public permalink; use Make private first for confidential client files.
+Share links do not certify file contents as malware-free.
 
-Only `pascal@miomideal.com` with the `ADMIO` role can use protected panel APIs,
-including media upload, listing, deletion, the older product-image upload, and
-panel sponsor management. Each protected call checks the current database account,
-so deleting the account or revoking its role blocks an existing session as well.
-Discord sign-in requires the same owner email and a verified OAuth email profile.
-Cross-origin browser mutations are rejected before multipart uploads are processed.
-Set `AUTH_URL` to the public panel URL when deploying behind a proxy.
+## Panel authorization
 
-The CDN key is used only on the server. Public sponsor checkout on `mio_page`
-continues accepting visitor logos as requested; those files can appear in the same
-CDN media library. This panel restriction does not disable that separate workflow.
+Only `pascal@miomideal.com` with the ADMIO role can manage media and shares. Discord
+sign-in requires a verified owner email. Protected API calls and private file
+reads check the current database account, blocking removed/revoked owner sessions.
+Cross-origin browser mutations are rejected before multipart processing.
+Set AUTH_URL to the public panel URL when deploying behind a proxy.
+
+Public sponsor checkout in mio_page continues accepting sanitized visitor logos.
+Those public files can appear in this same library. Public websites necessarily
+expose the images they display; CORS/referrer rules cannot prevent copying those
+images. The CDN provides no anonymous file-listing API or directory index.
+
+## Deployment
+
+Deploy CDN main first, then panel main. The CDN migration entrypoint adds
+File.isPublic (default true for legacy records), MediaShare, and MediaShareFile.
+No panel schema changes or new credentials are needed. Keep the existing CDN
+SERVER_ROOT volume persistent; private client uploads use SERVER_ROOT/private
+even when public files use S3, avoiding accidental public-bucket exposure.
+
+The panel uses existing server-only UPLOAD_URL (such as
+https://cdn.example.com/api/upload/) and UPLOAD_KEY matching CDN_API_KEY. Run Node
+20.19 or newer. Hosting/proxy request limits must permit the desired upload size;
+platforms with a smaller fixed body limit require a direct-upload design later.
+Nothing in this change automatically hides or deletes existing website assets.

@@ -3,6 +3,7 @@
 import { mediaFileMimeType } from "@/util/media-files";
 
 import Image from "next/image";
+import { MediaShares, MakePrivateDialog } from "./media-shares";
 import { useEffect, useRef, useState } from "react";
 import { api, type RouterOutputs } from "@/trpc/react";
 
@@ -11,6 +12,7 @@ type UploadResult = {
   name: string;
   status: string;
   url?: string;
+  isPublic?: boolean;
   error?: boolean;
 };
 const buttonClass =
@@ -22,12 +24,42 @@ function sizeLabel(bytes: number): string {
 }
 
 export function MediaManager() {
+  const [selected, setSelected] = useState<
+    Map<string, { id: string; name: string }>
+  >(new Map());
+  function toggleSelection(file: StoredFile): void {
+    setSelected((previous) => {
+      const next = new Map(previous);
+      if (next.has(file.id)) next.delete(file.id);
+      else if (next.size < 50)
+        next.set(file.id, {
+          id: file.id,
+          name: file.originalName ?? file.fileName ?? "Untitled file",
+        });
+      return next;
+    });
+  }
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [results, setResults] = useState<UploadResult[]>([]);
   const [message, setMessage] = useState("");
+  const [privacyFile, setPrivacyFile] = useState<StoredFile | null>(null);
+  const makePrivate = api.storage.makePrivate.useMutation();
+  async function moveToPrivate(): Promise<void> {
+    if (!privacyFile) return;
+    try {
+      await makePrivate.mutateAsync({ id: privacyFile.id });
+      setPrivacyFile(null);
+      await utils.storage.list.invalidate();
+      setMessage(
+        "File is now private. Create a new share link for your client.",
+      );
+    } catch {
+      /* Mutation error is shown in the confirmation dialog. */
+    }
+  }
   const [deleting, setDeleting] = useState<StoredFile | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -81,6 +113,7 @@ export function MediaManager() {
             name: file.name,
             status: "Uploaded",
             url: result.url,
+            isPublic: result.isPublic,
           };
         } catch (error) {
           queue[index] = {
@@ -103,6 +136,11 @@ export function MediaManager() {
     try {
       await remove.mutateAsync({ id: deleting.id });
       setDeleting(null);
+      setSelected((previous) => {
+        const next = new Map(previous);
+        next.delete(deleting.id);
+        return next;
+      });
       setMessage(
         "File deleted. Previously cached copies may remain available until they expire.",
       );
@@ -134,7 +172,7 @@ export function MediaManager() {
       >
         <h2 className="font-subhead text-xl">Drop files here</h2>
         <p className="my-3 text-sm text-body/60">
-          JPEG, PNG, PDF, or ZIP · Up to 50 MB per file · Public permalinks
+          JPEG, PNG, PDF, or ZIP · Up to 50 MB per file · Private client files
         </p>
         <input
           ref={input}
@@ -186,13 +224,19 @@ export function MediaManager() {
                   >
                     Open file
                   </a>
-                  <button
-                    type="button"
-                    className={buttonClass}
-                    onClick={() => void copy(result.url!)}
-                  >
-                    Copy permalink
-                  </button>
+                  {result.isPublic !== false ? (
+                    <button
+                      type="button"
+                      className={buttonClass}
+                      onClick={() => void copy(result.url!)}
+                    >
+                      Copy permalink
+                    </button>
+                  ) : (
+                    <span className="text-xs text-body/60">
+                      Private · Select below to create a client share
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -202,6 +246,17 @@ export function MediaManager() {
       <p role="status" className="text-sm text-highlight-cyan">
         {message}
       </p>
+      <MediaShares
+        selectedFiles={[...selected.values()]}
+        onClear={() => setSelected(new Map())}
+        onRemove={(id) =>
+          setSelected((previous) => {
+            const next = new Map(previous);
+            next.delete(id);
+            return next;
+          })
+        }
+      />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="flex flex-col gap-2 text-sm text-body/70">
           Search files
@@ -249,21 +304,41 @@ export function MediaManager() {
               className="overflow-hidden rounded-xl border border-body/10 bg-surface/50"
             >
               <div className="relative flex h-44 items-center justify-center bg-primary-900/50">
-                {file.mimeType.startsWith("image/") ? (
+                {file.mimeType.startsWith("image/") &&
+                (file.isPublic ||
+                  [
+                    "image/png",
+                    "image/jpeg",
+                    "image/gif",
+                    "image/webp",
+                  ].includes(file.mimeType)) ? (
                   <Image
                     unoptimized
-                    src={file.url}
+                    src={file.isPublic ? file.url : `${file.url}?preview=1`}
                     alt={file.originalName ?? "Uploaded image"}
                     fill
                     className="object-contain p-3"
                   />
                 ) : (
                   <span className="font-subhead text-3xl text-body/40">
-                    {file.mimeType === "application/pdf" ? "PDF" : "ZIP"}
+                    {file.mimeType === "application/pdf"
+                      ? "PDF"
+                      : file.mimeType.includes("zip")
+                        ? "ZIP"
+                        : "FILE"}
                   </span>
                 )}
               </div>
               <div className="space-y-3 p-4">
+                <label className="flex items-center gap-2 text-sm text-body/70">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(file.id)}
+                    disabled={!selected.has(file.id) && selected.size >= 50}
+                    onChange={() => toggleSelection(file)}
+                  />{" "}
+                  Select for sharing
+                </label>
                 <h2
                   className="truncate font-subhead"
                   title={file.originalName ?? file.fileName ?? file.id}
@@ -271,25 +346,36 @@ export function MediaManager() {
                   {file.originalName ?? file.fileName ?? "Untitled file"}
                 </h2>
                 <p className="text-xs text-body/50">
+                  {file.isPublic ? "Public" : "Private"} ·{" "}
                   {sizeLabel(file.size)} ·{" "}
                   {new Date(file.createdAt).toLocaleDateString()} ·{" "}
                   {file.mimeType}
                 </p>
                 <input
-                  aria-label={`Permalink for ${file.originalName ?? "file"}`}
+                  aria-label={
+                    file.isPublic
+                      ? `Public permalink for ${file.originalName ?? "file"}`
+                      : "Private client file"
+                  }
                   readOnly
-                  value={file.url}
+                  value={
+                    file.isPublic
+                      ? file.url
+                      : "Private — create a share link for clients"
+                  }
                   onFocus={(event) => event.target.select()}
                   className="w-full rounded border border-body/10 bg-primary-900/50 p-2 text-xs text-body/60"
                 />
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className={buttonClass}
-                    onClick={() => void copy(file.url)}
-                  >
-                    Copy permalink
-                  </button>
+                  {file.isPublic && (
+                    <button
+                      type="button"
+                      className={buttonClass}
+                      onClick={() => void copy(file.url)}
+                    >
+                      Copy permalink
+                    </button>
+                  )}
                   <a
                     className={buttonClass}
                     href={file.url}
@@ -298,6 +384,18 @@ export function MediaManager() {
                   >
                     Open file
                   </a>
+                  {file.isPublic && (
+                    <button
+                      type="button"
+                      className={buttonClass}
+                      onClick={() => {
+                        makePrivate.reset();
+                        setPrivacyFile(file);
+                      }}
+                    >
+                      Make private
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="ml-auto px-2 text-sm text-highlight-magenta"
@@ -336,6 +434,15 @@ export function MediaManager() {
             Next
           </button>
         </nav>
+      )}
+      {privacyFile && (
+        <MakePrivateDialog
+          name={privacyFile.originalName ?? privacyFile.fileName ?? "File"}
+          busy={makePrivate.isPending}
+          error={makePrivate.error?.message}
+          onCancel={() => setPrivacyFile(null)}
+          onConfirm={() => void moveToPrivate()}
+        />
       )}
       {deleting && (
         <dialog

@@ -1,3 +1,4 @@
+import { NextRequest } from "next/server";
 import { type PrismaClient } from "@prisma/client";
 import { type Session } from "next-auth";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,10 +7,11 @@ const mocks = vi.hoisted(() => ({
   account: vi.fn(),
   images: vi.fn(),
   fetch: vi.fn(),
+  auth: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/server/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/server/db", () => ({ db: {} }));
+vi.mock("@/server/auth", () => ({ auth: mocks.auth }));
+vi.mock("@/server/db", () => ({ db: { user: { findUnique: mocks.account } } }));
 vi.mock("@/env", () => ({
   env: {
     UPLOAD_URL: "https://cdn.example.com/api/upload/",
@@ -22,6 +24,8 @@ import {
   isPanelMutationOriginAllowed,
   isVerifiedOwnerSignIn,
 } from "@/server/auth/owner";
+
+import { GET as privateDownload } from "@/app/api/media/[fileId]/route";
 
 const owner = {
   id: "owner",
@@ -82,6 +86,15 @@ describe("panel upload authorization", () => {
         () => caller.storage.upload(upload()),
         () => caller.storage.list({ search: "", page: 0 }),
         () => caller.storage.delete({ id: "file" }),
+        () => caller.storage.makePrivate({ id: "file" }),
+        () =>
+          caller.storage.createShare({
+            title: "Client files",
+            fileIds: ["file"],
+            expiresInDays: 7,
+          }),
+        () => caller.storage.listShares({ page: 0 }),
+        () => caller.storage.revokeShare({ id: "share" }),
         () =>
           caller.media.upload({
             files: [{ name: "photo.png", data: "aGVsbG8=" }],
@@ -109,20 +122,26 @@ describe("panel upload authorization", () => {
     },
   );
   it("allows the current owner and forwards the CDN secret only from the server", async () => {
-    mocks.fetch.mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          files: [
-            {
-              originalName: "test.zip",
-              url: "/storage/test.zip",
-              size: 7,
-              mimetype: "application/zip",
-            },
-          ],
-        }),
-      ),
-    );
+    mocks.fetch
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ privateMedia: true })),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            files: [
+              {
+                id: "private-file",
+                isPublic: false,
+                originalName: "test.zip",
+                url: "/private/test.zip",
+                size: 7,
+                mimetype: "application/zip",
+              },
+            ],
+          }),
+        ),
+      );
     const result = await callers(owner).storage.upload(upload());
     expect(mocks.account).toHaveBeenCalledWith({
       where: { id: "owner" },
@@ -131,11 +150,31 @@ describe("panel upload authorization", () => {
     expect(mocks.fetch).toHaveBeenCalledWith(
       new URL("https://cdn.example.com/api/upload/single"),
       expect.objectContaining({
-        headers: { "X-API-Key": "server-only-test-key" },
+        headers: {
+          "X-API-Key": "server-only-test-key",
+          "X-Upload-Visibility": "private",
+        },
       }),
     );
-    expect(result[0]?.url).toBe("https://cdn.example.com/storage/test.zip");
+    expect(result[0]?.url).toBe("/api/media/private-file");
+    expect(result[0]?.isPublic).toBe(false);
     expect(JSON.stringify(result)).not.toContain("server-only-test-key");
+  });
+});
+
+describe("private upload deployment safety", () => {
+  it("never uploads bytes to a CDN that has not confirmed private-media support", async () => {
+    mocks.fetch.mockResolvedValue(
+      new Response(JSON.stringify({ privateMedia: false })),
+    );
+    await expect(callers(owner).storage.upload(upload())).rejects.toMatchObject(
+      { code: "PRECONDITION_FAILED" },
+    );
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      new URL("https://cdn.example.com/api/upload/capabilities"),
+      expect.anything(),
+    );
   });
 });
 
@@ -213,5 +252,91 @@ describe("browser mutation origins", () => {
         "panel.example.com",
       ),
     ).toBe(true);
+  });
+});
+
+describe("owner share management", () => {
+  it("forwards creation as authenticated JSON and keeps the secret out of the client response", async () => {
+    const token = "a".repeat(43);
+    mocks.fetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "share",
+          title: "Client files",
+          token,
+          expiresAt: "2099-01-01T00:00:00.000Z",
+        }),
+      ),
+    );
+    const input = {
+      title: "Client files",
+      fileIds: ["file"],
+      expiresInDays: 7 as const,
+    };
+    const result = await callers(owner).storage.createShare(input);
+    expect(result.token).toBe(token);
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      new URL("https://cdn.example.com/api/upload/shares"),
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": "server-only-test-key",
+        },
+        body: JSON.stringify(input),
+      }),
+    );
+    expect(JSON.stringify(result)).not.toContain("server-only-test-key");
+  });
+});
+
+describe("private media byte access", () => {
+  it.each([null, { user: { ...owner, email: "other@example.com" } }])(
+    "blocks unauthenticated and non-owner file reads",
+    async (session) => {
+      mocks.auth.mockResolvedValue(session);
+      const response = await privateDownload(
+        new NextRequest("https://panel.example.com/api/media/file"),
+        { params: Promise.resolve({ fileId: "file" }) },
+      );
+      expect([401, 403]).toContain(response.status);
+      expect(mocks.fetch).not.toHaveBeenCalled();
+    },
+  );
+  it("checks revocation before fetching any private file bytes", async () => {
+    mocks.auth.mockResolvedValue({ user: owner });
+    mocks.account.mockResolvedValue(null);
+    const response = await privateDownload(
+      new NextRequest("https://panel.example.com/api/media/file"),
+      { params: Promise.resolve({ fileId: "file" }) },
+    );
+    expect(response.status).toBe(403);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+  it("streams bytes only to the owner and never forwards backend credentials to the browser", async () => {
+    mocks.auth.mockResolvedValue({ user: owner });
+    mocks.fetch.mockResolvedValue(
+      new Response("private file bytes", {
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-API-Key": "should-not-leak",
+        },
+      }),
+    );
+    const response = await privateDownload(
+      new NextRequest("https://panel.example.com/api/media/file"),
+      { params: Promise.resolve({ fileId: "file" }) },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("private file bytes");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(response.headers.get("cross-origin-resource-policy")).toBe(
+      "same-origin",
+    );
+    expect(response.headers.get("x-api-key")).toBeNull();
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      new URL("https://cdn.example.com/api/upload/files/file/download"),
+      expect.anything(),
+    );
   });
 });

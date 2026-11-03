@@ -27,7 +27,8 @@ export default async function MediaPage() {
               Media library
             </h1>
             <p className="mt-2 text-sm text-body/60">
-              Upload files, copy their public permalinks, and manage your media.
+              Upload private client files, create download shares, and manage
+              your media.
             </p>
           </header>
           <MediaManager />
