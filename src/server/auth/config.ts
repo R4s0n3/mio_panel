@@ -3,6 +3,7 @@ import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import DiscordProvider from "next-auth/providers/discord";
 
 import { db } from "@/server/db";
+import { isVerifiedOwnerSignIn } from "./owner";
 import type { MioRole } from "@prisma/client";
 
 /**
@@ -49,8 +50,8 @@ export const authConfig = {
   adapter: PrismaAdapter(db),
   trustHost: true,
   callbacks: {
-    async signIn({ user }) {
-      return user.email === "pascal@miomideal.com";
+    async signIn({ user, account, profile }) {
+      return isVerifiedOwnerSignIn(user.email, account?.provider, profile);
     },
     session: async ({ session, user }) => {
       const account = await db.user.findUnique({

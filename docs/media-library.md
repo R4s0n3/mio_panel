@@ -37,3 +37,18 @@ MySQL and database-owned API keys. The active CDN work retains that S3 setup;
 upstream CDN synchronization is pending a deliberate storage/database migration.
 The media endpoints in this change target the existing local S3 implementation.
 Backup stashes named `codex-before-media-sync` remain in repositories where needed.
+
+
+## Panel access
+
+Only `pascal@miomideal.com` with the `ADMIO` role can use protected panel APIs,
+including media upload, listing, deletion, the older product-image upload, and
+panel sponsor management. Each protected call checks the current database account,
+so deleting the account or revoking its role blocks an existing session as well.
+Discord sign-in requires the same owner email and a verified OAuth email profile.
+Cross-origin browser mutations are rejected before multipart uploads are processed.
+Set `AUTH_URL` to the public panel URL when deploying behind a proxy.
+
+The CDN key is used only on the server. Public sponsor checkout on `mio_page`
+continues accepting visitor logos as requested; those files can appear in the same
+CDN media library. This panel restriction does not disable that separate workflow.

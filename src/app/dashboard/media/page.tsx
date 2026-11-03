@@ -1,15 +1,13 @@
 import LoginPage from "@/app/_components/login-page";
 import { auth } from "@/server/auth";
+import { isPanelOwner } from "@/server/auth/owner";
 import Navigation from "../_components/navigation";
 import { MediaManager } from "./media-manager";
 
 export default async function MediaPage() {
   const session = await auth();
   if (!session) return <LoginPage />;
-  if (
-    session.user.role !== "ADMIO" ||
-    session.user.email !== "pascal@miomideal.com"
-  ) {
+  if (!isPanelOwner(session.user)) {
     return (
       <main className="min-h-screen bg-primary-900 p-8 text-headings">
         You are not allowed to see this content.

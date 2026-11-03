@@ -12,6 +12,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { auth } from "@/server/auth";
+import { isPanelOwner } from "@/server/auth/owner";
 import { db } from "@/server/db";
 
 /**
@@ -120,14 +121,18 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  */
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
-  .use(({ ctx, next }) => {
+  .use(async ({ ctx, next }) => {
     if (!ctx.session || !ctx.session.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
-    if (
-      ctx.session.user.email !== "pascal@miomideal.com" ||
-      ctx.session.user.role !== "ADMIO"
-    ) {
+    if (!ctx.session.user.id || !isPanelOwner(ctx.session.user)) {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+    const account = await ctx.db.user.findUnique({
+      where: { id: ctx.session.user.id },
+      select: { email: true, role: true },
+    });
+    if (!isPanelOwner(account)) {
       throw new TRPCError({ code: "FORBIDDEN" });
     }
     return next({
